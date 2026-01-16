@@ -29,6 +29,17 @@ pub struct ResponsesRequest {
     pub stream: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ResponsesCompactRequest {
+    pub model: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instructions: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_response_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ResponsesResponse {
     pub id: Option<String>,
@@ -57,6 +68,13 @@ impl ResponsesClient {
         format!("{}/responses", self.config.base_url.trim_end_matches('/'))
     }
 
+    fn compact_url(&self) -> String {
+        format!(
+            "{}/responses/compact",
+            self.config.base_url.trim_end_matches('/')
+        )
+    }
+
     pub async fn create(&self, req: &ResponsesRequest) -> Result<ResponsesResponse, AgentError> {
         let mut rb = self.http.post(self.url());
         if !self.config.api_key.is_empty() {
@@ -68,6 +86,28 @@ impl ResponsesClient {
         if !status.is_success() {
             return Err(AgentError::Other(format!(
                 "Responses API HTTP {} error: {}",
+                status, body_text
+            )));
+        }
+        let parsed: ResponsesResponse =
+            serde_json::from_str(&body_text).map_err(AgentError::from)?;
+        Ok(parsed)
+    }
+
+    pub async fn compact(
+        &self,
+        req: &ResponsesCompactRequest,
+    ) -> Result<ResponsesResponse, AgentError> {
+        let mut rb = self.http.post(self.compact_url());
+        if !self.config.api_key.is_empty() {
+            rb = rb.bearer_auth(&self.config.api_key);
+        }
+        let response = rb.json(req).send().await.map_err(AgentError::from)?;
+        let status = response.status();
+        let body_text = response.text().await.map_err(AgentError::from)?;
+        if !status.is_success() {
+            return Err(AgentError::Other(format!(
+                "Responses Compact API HTTP {} error: {}",
                 status, body_text
             )));
         }
