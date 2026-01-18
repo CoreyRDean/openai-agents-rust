@@ -18,11 +18,11 @@ This crate provides a library and CLI to build agents that call OpenAI-compatibl
 
 ## Quickstart
 
-Install:
+Install (use this repo via git, not crates.io):
 
 ```toml
 [dependencies]
-openai-agents-rust = "0.1"
+openai-agents-rust = { git = "https://github.com/CoreyRDean/openai-agents-rust.git", branch = "main" }
 ```
 
 1. Create a .env with your model server details (base_url is required):

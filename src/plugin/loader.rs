@@ -46,6 +46,7 @@ impl PluginRegistry {
     /// leaked (`std::mem::forget`) to keep it alive for the duration of the
     /// program; a production implementation would store the `Library` handles
     /// inside the registry to manage their lifetimes.
+    #[allow(clippy::result_large_err)]
     pub fn load_from_dir<P: AsRef<Path>>(path: P) -> Result<Self, crate::error::AgentError> {
         let mut registry = Self::new();
 
