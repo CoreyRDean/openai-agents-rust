@@ -84,11 +84,13 @@ impl ResponsesClient {
     where
         F: FnMut(Value) -> Result<(), AgentError>,
     {
+        let mut req = req.clone();
+        req.stream = Some(true);
         let mut rb = self.http.post(self.url());
         if !self.config.api_key.is_empty() {
             rb = rb.bearer_auth(&self.config.api_key);
         }
-        let response = rb.json(req).send().await.map_err(AgentError::from)?;
+        let response = rb.json(&req).send().await.map_err(AgentError::from)?;
         let status = response.status();
         if !status.is_success() {
             let body_text = response.text().await.map_err(AgentError::from)?;
