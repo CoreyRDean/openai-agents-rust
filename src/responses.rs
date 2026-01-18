@@ -127,20 +127,18 @@ impl ResponsesClient {
 }
 
 fn find_event_boundary(buf: &[u8]) -> Option<usize> {
-    buf.windows(2)
-        .position(|w| w == b"\n\n")
-        .map(|pos| pos + 2)
+    buf.windows(2).position(|w| w == b"\n\n").map(|pos| pos + 2)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::Router;
     use axum::body::Body;
     use axum::extract::Json;
     use axum::http::StatusCode;
     use axum::response::Response;
     use axum::routing::post;
-    use axum::Router;
     use serde_json::json;
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
@@ -176,7 +174,10 @@ mod tests {
             "/responses",
             post(move |Json(payload): Json<Value>| async move {
                 *seen_body_clone.lock().expect("lock body") = Some(payload);
-                (StatusCode::OK, Json(json!({ "id": "resp_123", "output": [] })))
+                (
+                    StatusCode::OK,
+                    Json(json!({ "id": "resp_123", "output": [] })),
+                )
             }),
         );
 
@@ -276,10 +277,7 @@ mod tests {
 
         client
             .create_stream(&req, move |value| {
-                events_clone
-                    .lock()
-                    .expect("lock events")
-                    .push(value);
+                events_clone.lock().expect("lock events").push(value);
                 Ok(())
             })
             .await
