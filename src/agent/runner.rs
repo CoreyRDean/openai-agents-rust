@@ -129,10 +129,10 @@ impl Runner {
         // Collect OpenAI tool specs for enabled tools
         let mut tool_specs: Vec<serde_json::Value> = Vec::new();
         for t in ctx.tools.all() {
-            if t.openai_tool_spec().is_some() && t.is_enabled(ctx).await {
-                if let Some(spec) = t.openai_tool_spec() {
-                    tool_specs.push(spec);
-                }
+            if let Some(spec) = t.openai_tool_spec()
+                && t.is_enabled(ctx).await
+            {
+                tool_specs.push(spec);
             }
         }
         // Compatibility: allow disabling passing tools to the LLM via env flag

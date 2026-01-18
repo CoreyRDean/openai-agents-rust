@@ -147,31 +147,30 @@ fn map_openai_tools_to_oss(
     let mut out = Vec::new();
     if let Some(arr) = tools {
         for t in arr.iter() {
-            if let Some(obj) = t.as_object() {
-                if obj.get("type").and_then(|v| v.as_str()) == Some("function") {
-                    if let Some(func) = obj.get("function").and_then(|v| v.as_object()) {
-                        let name = func
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string();
-                        let description = func
-                            .get("description")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-                        let parameters = func
-                            .get("parameters")
-                            .cloned()
-                            .unwrap_or(serde_json::json!({"type":"object"}));
-                        out.push(FunctionToolDefinition {
-                            ty: "function".into(),
-                            name,
-                            parameters,
-                            description,
-                            strict: Some(false),
-                        });
-                    }
-                }
+            if let Some(obj) = t.as_object()
+                && obj.get("type").and_then(|v| v.as_str()) == Some("function")
+                && let Some(func) = obj.get("function").and_then(|v| v.as_object())
+            {
+                let name = func
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let description = func
+                    .get("description")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let parameters = func
+                    .get("parameters")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({"type":"object"}));
+                out.push(FunctionToolDefinition {
+                    ty: "function".into(),
+                    name,
+                    parameters,
+                    description,
+                    strict: Some(false),
+                });
             }
         }
     }
@@ -291,15 +290,15 @@ impl Model for GptOssResponses {
             },
             store: if disable_prev { None } else { Some(true) },
         };
-        if var_bool("OSS_DEBUG_PAYLOAD", false) {
-            if let Ok(j) = serde_json::to_string_pretty(&body) {
-                tracing::debug!(target = "gpt_oss_responses", payload = %j, "OSS Responses request body");
-            }
+        if var_bool("OSS_DEBUG_PAYLOAD", false)
+            && let Ok(j) = serde_json::to_string_pretty(&body)
+        {
+            tracing::debug!(target = "gpt_oss_responses", payload = %j, "OSS Responses request body");
         }
-        if var_bool("OSS_DEBUG_HTTP", false) {
-            if let Ok(j) = serde_json::to_string_pretty(&body) {
-                eprintln!("OSS Responses REQUEST: {}", j);
-            }
+        if var_bool("OSS_DEBUG_HTTP", false)
+            && let Ok(j) = serde_json::to_string_pretty(&body)
+        {
+            eprintln!("OSS Responses REQUEST: {}", j);
         }
         let resp = req.json(&body).send().await.map_err(AgentError::from)?;
         let status = resp.status();

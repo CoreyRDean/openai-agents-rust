@@ -197,12 +197,11 @@ impl Model for OpenAiChat {
                 // Build legacy functions list
                 let mut functions: Vec<serde_json::Value> = Vec::new();
                 for tool in t.iter() {
-                    if let Some(obj) = tool.as_object() {
-                        if obj.get("type").and_then(|v| v.as_str()) == Some("function") {
-                            if let Some(func) = obj.get("function") {
-                                functions.push(func.clone());
-                            }
-                        }
+                    if let Some(obj) = tool.as_object()
+                        && obj.get("type").and_then(|v| v.as_str()) == Some("function")
+                        && let Some(func) = obj.get("function")
+                    {
+                        functions.push(func.clone());
                     }
                 }
                 if !functions.is_empty() {
@@ -240,10 +239,10 @@ impl Model for OpenAiChat {
             }
         }
 
-        if var_bool("VLLM_DEBUG_PAYLOAD", false) {
-            if let Ok(pretty) = serde_json::to_string_pretty(&payload) {
-                debug!(target: "openai_chat", payload = %pretty, "request payload");
-            }
+        if var_bool("VLLM_DEBUG_PAYLOAD", false)
+            && let Ok(pretty) = serde_json::to_string_pretty(&payload)
+        {
+            debug!(target: "openai_chat", payload = %pretty, "request payload");
         }
         debug!(
             target: "openai_chat",

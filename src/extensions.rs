@@ -6,5 +6,6 @@ pub trait Extension: Send + Sync {
     fn name(&self) -> &str;
 
     /// Initialise the extension with access to configuration and client.
+    #[allow(clippy::result_large_err)]
     fn init(&self, config: &crate::config::Config) -> Result<(), AgentError>;
 }

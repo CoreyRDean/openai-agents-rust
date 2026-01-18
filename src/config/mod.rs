@@ -16,6 +16,7 @@ pub use schema::Config;
 ///
 /// Returns `AgentError` if the file cannot be read, parsed, or if required fields
 /// are missing.
+#[allow(clippy::result_large_err)]
 pub fn load_from_path<P: AsRef<Path>>(path: P) -> Result<Config, AgentError> {
     // Build a config loader using the builder API (the `merge` method was removed in recent versions).
     let builder = ConfigLoader::builder()
@@ -74,9 +75,9 @@ fn apply_env_overrides(cfg: &mut Config) {
     if let Some(m) = var_nonempty("OPENAI_MODEL") {
         cfg.model = m;
     }
-    if let Ok(lvl) = std::env::var("RUST_LOG") {
-        if !lvl.trim().is_empty() {
-            cfg.log_level = lvl;
-        }
+    if let Ok(lvl) = std::env::var("RUST_LOG")
+        && !lvl.trim().is_empty()
+    {
+        cfg.log_level = lvl;
     }
 }

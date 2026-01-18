@@ -17,6 +17,7 @@ pub trait Model: Send + Sync {
 
     /// Rich response method (scaffold) to align with Python's get_response signature.
     /// Default implementation wraps `generate` with a simple string prompt.
+    #[allow(clippy::too_many_arguments)]
     async fn get_response(
         &self,
         system_instructions: Option<&str>,

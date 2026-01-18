@@ -25,8 +25,13 @@ impl LiteLLM {
         } else {
             Some(config.api_key.clone())
         };
-    let base_url = config.base_url.clone();
-    Self { client, config, base_url, auth_token }
+        let base_url = config.base_url.clone();
+        Self {
+            client,
+            config,
+            base_url,
+            auth_token,
+        }
     }
 
     /// Override the base URL (e.g., http://192.168.3.40:8000/v1)
@@ -200,7 +205,7 @@ impl Model for LiteLLM {
                     let text = v
                         .get("choices")
                         .and_then(|c| c.as_array())
-                        .and_then(|arr| arr.get(0))
+                        .and_then(|arr| arr.first())
                         .and_then(|c0| {
                             c0.get("message")
                                 .and_then(|m| m.get("content"))

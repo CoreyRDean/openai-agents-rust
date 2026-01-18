@@ -102,10 +102,10 @@ impl Realtime for OpenAiChatRealtime {
 }
 
 /// StreamItem backed by parsing SSE "data:" lines from an HTTP response.
+type SseStream = Pin<Box<dyn futures_core::Stream<Item = Result<String, AgentError>> + Send>>;
+
 struct SseStreamItem {
-    stream: tokio::sync::Mutex<
-        Pin<Box<dyn futures_core::Stream<Item = Result<String, AgentError>> + Send>>,
-    >,
+    stream: tokio::sync::Mutex<SseStream>,
 }
 
 impl SseStreamItem {
@@ -118,26 +118,24 @@ impl SseStreamItem {
                     let chunk: Bytes = chunk.map_err(AgentError::from)?;
                     buf.extend_from_slice(&chunk);
                     // process complete lines
-                    loop {
-                        if let Some(pos) = buf.iter().position(|b| *b == b'\n') {
-                            let line = buf.drain(..=pos).collect::<Vec<u8>>();
-                            let line = String::from_utf8_lossy(&line).to_string();
-                            let line = line.trim();
-                            if line.is_empty() { continue; }
-                            if let Some(rest) = line.strip_prefix("data: ") {
-                                let data = rest.trim();
-                                if data == "[DONE]" { break; }
-                                // Try parse JSON, extract text deltas
-                                if let Ok(v) = serde_json::from_str::<Value>(data) {
-                                    // OpenAI: choices[0].delta.content or choices[0].text
-                                    let maybe = v
-                                        .get("choices").and_then(|c| c.as_array()).and_then(|arr| arr.get(0))
-                                        .and_then(|c0| c0.get("delta").and_then(|d| d.get("content")).and_then(|t| t.as_str()).map(|s| s.to_string())
-                                            .or_else(|| c0.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())));
-                                    if let Some(text) = maybe { if !text.is_empty() { yield text; } }
-                                }
+                    while let Some(pos) = buf.iter().position(|b| *b == b'\n') {
+                        let line = buf.drain(..=pos).collect::<Vec<u8>>();
+                        let line = String::from_utf8_lossy(&line).to_string();
+                        let line = line.trim();
+                        if line.is_empty() { continue; }
+                        if let Some(rest) = line.strip_prefix("data: ") {
+                            let data = rest.trim();
+                            if data == "[DONE]" { break; }
+                            // Try parse JSON, extract text deltas
+                            if let Ok(v) = serde_json::from_str::<Value>(data) {
+                                // OpenAI: choices[0].delta.content or choices[0].text
+                                let maybe = v
+                                    .get("choices").and_then(|c| c.as_array()).and_then(|arr| arr.first())
+                                    .and_then(|c0| c0.get("delta").and_then(|d| d.get("content")).and_then(|t| t.as_str()).map(|s| s.to_string())
+                                        .or_else(|| c0.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())));
+                                if let Some(text) = maybe && !text.is_empty() { yield text; }
                             }
-                        } else { break; }
+                        }
                     }
                 }
         };

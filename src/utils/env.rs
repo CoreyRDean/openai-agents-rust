@@ -18,7 +18,11 @@ pub fn var_bool(name: &str, default: bool) -> bool {
 pub fn var_nonempty(name: &str) -> Option<String> {
     env::var(name).ok().and_then(|v| {
         let t = v.trim();
-        if t.is_empty() { None } else { Some(t.to_string()) }
+        if t.is_empty() {
+            None
+        } else {
+            Some(t.to_string())
+        }
     })
 }
 

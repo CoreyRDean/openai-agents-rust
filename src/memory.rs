@@ -1,8 +1,8 @@
+use crate::error::AgentError;
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::error::AgentError;
 
 /// Trait representing a generic memory store.
 #[async_trait]

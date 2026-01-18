@@ -227,11 +227,15 @@ mod tests {
                 .unwrap();
         });
 
-    let _ = dotenvy::dotenv();
-    let mut cfg = crate::config::load_from_env();
-    cfg.api_key = String::new();
-    cfg.model = if cfg.model.is_empty() { "whisper-1".into() } else { cfg.model };
-    cfg.base_url = format!("http://{}:{}", addr.ip(), addr.port());
+        let _ = dotenvy::dotenv();
+        let mut cfg = crate::config::load_from_env();
+        cfg.api_key = String::new();
+        cfg.model = if cfg.model.is_empty() {
+            "whisper-1".into()
+        } else {
+            cfg.model
+        };
+        cfg.base_url = format!("http://{}:{}", addr.ip(), addr.port());
         let stt = OpenAiStt::new(cfg.clone());
         let tts = OpenAiTts::new(cfg.clone());
         let pipe = HttpVoicePipeline::new(Box::new(stt), Box::new(tts));

@@ -11,6 +11,7 @@ use openai_agents_rust::plugin::loader::PluginRegistry;
 use openai_agents_rust::tracing::init_tracing;
 
 #[tokio::main]
+#[allow(clippy::result_large_err)]
 async fn main() -> Result<(), AgentError> {
     // Load .env for local development (non-fatal if missing)
     let _ = dotenvy::dotenv();
