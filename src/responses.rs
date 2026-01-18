@@ -131,3 +131,165 @@ fn find_event_boundary(buf: &[u8]) -> Option<usize> {
         .position(|w| w == b"\n\n")
         .map(|pos| pos + 2)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::Body;
+    use axum::extract::Json;
+    use axum::http::StatusCode;
+    use axum::response::Response;
+    use axum::routing::post;
+    use axum::Router;
+    use serde_json::json;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+    use tokio::net::TcpListener;
+
+    async fn spawn_test_server(router: Router) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test server");
+        let addr = listener.local_addr().expect("server local addr");
+        tokio::spawn(async move {
+            axum::serve(listener, router).await.expect("serve test");
+        });
+        format!("http://{}", addr)
+    }
+
+    fn test_config(base_url: String) -> Config {
+        Config {
+            api_key: String::new(),
+            model: "gpt-4o-mini".to_string(),
+            base_url,
+            log_level: "info".to_string(),
+            plugins_path: PathBuf::from("."),
+            max_concurrent_requests: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn create_parses_success_response() {
+        let seen_body: Arc<Mutex<Option<Value>>> = Arc::new(Mutex::new(None));
+        let seen_body_clone = Arc::clone(&seen_body);
+        let app = Router::new().route(
+            "/responses",
+            post(move |Json(payload): Json<Value>| async move {
+                *seen_body_clone.lock().expect("lock body") = Some(payload);
+                (StatusCode::OK, Json(json!({ "id": "resp_123", "output": [] })))
+            }),
+        );
+
+        let base_url = spawn_test_server(app).await;
+        let client = ResponsesClient::new(test_config(base_url));
+
+        let req = ResponsesRequest {
+            instructions: Some("be concise".to_string()),
+            model: Some("gpt-4o-mini".to_string()),
+            input: json!([{"role":"user","content":"hello"}]),
+            tools: None,
+            reasoning: None,
+            max_output_tokens: None,
+            truncation: None,
+            previous_response_id: None,
+            store: None,
+            stream: None,
+        };
+
+        let response = client.create(&req).await.expect("create response");
+        assert_eq!(response.id.as_deref(), Some("resp_123"));
+
+        let captured = seen_body.lock().expect("lock body").clone();
+        let captured = captured.expect("capture request body");
+        assert_eq!(captured["input"], req.input);
+        assert_eq!(captured["model"], "gpt-4o-mini");
+    }
+
+    #[tokio::test]
+    async fn create_returns_error_on_http_failure() {
+        let app = Router::new().route(
+            "/responses",
+            post(|| async { (StatusCode::UNAUTHORIZED, "nope") }),
+        );
+        let base_url = spawn_test_server(app).await;
+        let client = ResponsesClient::new(test_config(base_url));
+
+        let req = ResponsesRequest {
+            instructions: None,
+            model: Some("gpt-4o-mini".to_string()),
+            input: json!([{"role":"user","content":"hello"}]),
+            tools: None,
+            reasoning: None,
+            max_output_tokens: None,
+            truncation: None,
+            previous_response_id: None,
+            store: None,
+            stream: None,
+        };
+
+        let err = client.create(&req).await.expect_err("expected error");
+        let err_text = err.to_string();
+        assert!(
+            err_text.contains("Responses API HTTP 401"),
+            "unexpected error: {}",
+            err_text
+        );
+    }
+
+    #[tokio::test]
+    async fn create_stream_emits_events_until_done() {
+        let body = [
+            r#"data: {"type":"response.output_text.delta","delta":"hello"}"#,
+            "",
+            "data: [DONE]",
+            "",
+        ]
+        .join("\n");
+        let app = Router::new().route(
+            "/responses",
+            post(move || async move {
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header("content-type", "text/event-stream")
+                    .body(Body::from(body))
+                    .expect("sse response")
+            }),
+        );
+        let base_url = spawn_test_server(app).await;
+        let client = ResponsesClient::new(test_config(base_url));
+
+        let events: Arc<Mutex<Vec<Value>>> = Arc::new(Mutex::new(Vec::new()));
+        let events_clone = Arc::clone(&events);
+
+        let req = ResponsesRequest {
+            instructions: None,
+            model: Some("gpt-4o-mini".to_string()),
+            input: json!([{"role":"user","content":"stream"}]),
+            tools: None,
+            reasoning: None,
+            max_output_tokens: None,
+            truncation: None,
+            previous_response_id: None,
+            store: None,
+            stream: None,
+        };
+
+        client
+            .create_stream(&req, move |value| {
+                events_clone
+                    .lock()
+                    .expect("lock events")
+                    .push(value);
+                Ok(())
+            })
+            .await
+            .expect("stream ok");
+
+        let captured = events.lock().expect("lock events");
+        assert_eq!(captured.len(), 1);
+        assert_eq!(
+            captured[0],
+            json!({"type":"response.output_text.delta","delta":"hello"})
+        );
+    }
+}
