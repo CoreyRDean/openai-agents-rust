@@ -278,6 +278,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn compact_parses_success_response() {
+        let seen_body: Arc<Mutex<Option<Value>>> = Arc::new(Mutex::new(None));
+        let seen_body_clone = Arc::clone(&seen_body);
+        let app = Router::new().route(
+            "/responses/compact",
+            post(move |Json(payload): Json<Value>| async move {
+                *seen_body_clone.lock().expect("lock body") = Some(payload);
+                (
+                    StatusCode::OK,
+                    Json(json!({ "id": "resp_compact_456", "output": [] })),
+                )
+            }),
+        );
+
+        let base_url = spawn_test_server(app).await;
+        let client = ResponsesClient::new(test_config(base_url));
+
+        let req = ResponsesCompactRequest {
+            model: "gpt-4o-mini".to_string(),
+            input: Some(json!([{"role":"user","content":"compact"}])),
+            instructions: Some("be brief".to_string()),
+            previous_response_id: Some("resp_prev".to_string()),
+        };
+
+        let response = client.compact(&req).await.expect("compact response");
+        assert_eq!(response.id.as_deref(), Some("resp_compact_456"));
+
+        let captured = seen_body.lock().expect("lock body").clone();
+        let captured = captured.expect("capture request body");
+        assert_eq!(captured["model"], "gpt-4o-mini");
+        assert_eq!(captured["input"], req.input.clone().unwrap());
+        assert_eq!(captured["instructions"], "be brief");
+        assert_eq!(captured["previous_response_id"], "resp_prev");
+    }
+
+    #[tokio::test]
+    async fn compact_returns_error_on_http_failure() {
+        let app = Router::new().route(
+            "/responses/compact",
+            post(|| async { (StatusCode::BAD_REQUEST, "bad") }),
+        );
+        let base_url = spawn_test_server(app).await;
+        let client = ResponsesClient::new(test_config(base_url));
+
+        let req = ResponsesCompactRequest {
+            model: "gpt-4o-mini".to_string(),
+            input: Some(json!([{"role":"user","content":"compact"}])),
+            instructions: None,
+            previous_response_id: None,
+        };
+
+        let err = client.compact(&req).await.expect_err("expected error");
+        let err_text = err.to_string();
+        assert!(
+            err_text.contains("Responses Compact API HTTP 400"),
+            "unexpected error: {}",
+            err_text
+        );
+    }
+
+    #[tokio::test]
     async fn create_stream_emits_events_until_done() {
         let body = [
             r#"data: {"type":"response.output_text.delta","delta":"hello"}"#,
