@@ -13,6 +13,7 @@ pub mod model;
 pub mod plugin;
 pub mod prompts;
 pub mod realtime;
+pub mod responses;
 pub mod results;
 pub mod tools;
 pub mod tracing;
