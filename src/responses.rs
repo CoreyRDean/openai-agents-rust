@@ -22,6 +22,8 @@ pub struct ResponsesRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub truncation: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub prompt_cache_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub previous_response_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<bool>,
@@ -232,6 +234,7 @@ mod tests {
             reasoning: None,
             max_output_tokens: None,
             truncation: None,
+            prompt_cache_key: None,
             previous_response_id: None,
             store: None,
             stream: None,
@@ -263,6 +266,7 @@ mod tests {
             reasoning: None,
             max_output_tokens: None,
             truncation: None,
+            prompt_cache_key: None,
             previous_response_id: None,
             store: None,
             stream: None,
@@ -371,6 +375,7 @@ mod tests {
             reasoning: None,
             max_output_tokens: None,
             truncation: None,
+            prompt_cache_key: None,
             previous_response_id: None,
             store: None,
             stream: None,
