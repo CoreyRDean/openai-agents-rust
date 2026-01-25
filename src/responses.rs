@@ -5,6 +5,8 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::timeout;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponsesRequest {
@@ -144,7 +146,23 @@ impl ResponsesClient {
 
         let mut stream = response.bytes_stream();
         let mut buffer = Vec::new();
-        while let Some(chunk) = stream.next().await {
+        let idle_timeout = responses_stream_idle_timeout();
+        loop {
+            let next = match idle_timeout {
+                Some(idle) => match timeout(idle, stream.next()).await {
+                    Ok(next) => next,
+                    Err(_) => {
+                        return Err(AgentError::Other(format!(
+                            "Responses stream idle timeout after {}ms",
+                            idle.as_millis()
+                        )));
+                    }
+                },
+                None => stream.next().await,
+            };
+            let Some(chunk) = next else {
+                break;
+            };
             let chunk = chunk.map_err(AgentError::from)?;
             buffer.extend_from_slice(&chunk);
             while let Some(idx) = find_event_boundary(&buffer) {
@@ -165,6 +183,18 @@ impl ResponsesClient {
             }
         }
         Ok(())
+    }
+}
+
+fn responses_stream_idle_timeout() -> Option<Duration> {
+    let ms = std::env::var("IDW_RESPONSES_STREAM_IDLE_TIMEOUT_MS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(600_000);
+    if ms == 0 {
+        None
+    } else {
+        Some(Duration::from_millis(ms))
     }
 }
 
